@@ -1,0 +1,5 @@
+if(EXISTS "/home/user/Desktop/insects_db/build/TESTS[1]_tests.cmake")
+  include("/home/user/Desktop/insects_db/build/TESTS[1]_tests.cmake")
+else()
+  add_test(TESTS_NOT_BUILT TESTS_NOT_BUILT)
+endif()

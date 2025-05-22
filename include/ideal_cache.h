@@ -1,104 +1,90 @@
-#pragma once 
+#pragma once
 
 #include <iostream>
 #include <unordered_map>
-#include <set>
 #include <list>
-#include <vector>
-#include <cstddef>
+#include <set>
 
-template <typename KeyT, typename Compare = std::less<KeyT>>
-class IdealCache {
-	using PairT = std::pair<KeyT, size_t>;
-	using ListT = std::list<size_t>;
-private:
-	size_t size_;
-	struct cmp_for_set;
-	std::set<PairT, cmp_for_set> set_;
-	std::unordered_map<KeyT, size_t> umap_;
-	std::unordered_map<KeyT, ListT> data_;
-	std::vector<KeyT> keys_;
-	Compare cmp_;
-	size_t ans_ = 0;
-
-	struct cmp_for_set {
-		bool operator() (const PairT& a, const PairT& b) const{
-			return a.second < b.second;
-		}
-	};
-
-private:
-	inline void map_keys(const std::vector<KeyT>& keys);
-	inline bool insert_page(const KeyT& key, size_t next_hit);
-    inline void set_delete_by_key(const KeyT& key);
-    inline void cache_add(const KeyT& key, size_t next_hit);
-public:
-	explicit IdealCache(const std::vector<KeyT>& keys, size_t size = 0, const Compare& cmp = Compare()) 
-		: size_(size), cmp_(cmp), keys_(keys) { map_keys(keys); std::cout << "ctor ended\n"; }
-	inline size_t get_ans();
+enum Ideal_cache_input_res {
+	tick = 1,
+	miss = 0
 };
 
-template <typename KeyT, typename Compare>
-void IdealCache<KeyT, Compare>::map_keys(const std::vector<KeyT>& keys) {
-    printf("in mapping keys\n");
-	for (size_t i = 1, ie = keys.size()+1; i < ie; ++i) {
-        printf("here\n");
-		data_[keys[i-1]].push_front(i);
+struct Page{
+	int page_number;
+	int next_hit;
+};
+
+struct cmp {
+	bool operator() (struct Page a1, struct Page a2) const {
+		return a1.next_hit < a2.next_hit;
 	}
-	for (auto& i : this->data_) { i.second.push_front(0); }
-}
+};
 
-template <typename KeyT, typename Compare>
-void IdealCache<KeyT, Compare>::set_delete_by_key(const KeyT& key) {
-    auto i = set_.begin();
-    while (!cmp_(i->first, key)) { ++i; }
-    set_.erase(i); 
-}
+class Ideal_cache {
+	private: 
+		size_t cache_size;
+		std::set <struct Page, cmp> p_set;
+		
+		std::unordered_map <int, int> p_umap;
+	public: 
+		Ideal_cache (size_t cache_sz) : cache_size(cache_sz) {} 
+		Ideal_cache_input_res insert_page (int page_number, int next_hit) {
+			struct Page cur_page = {page_number, next_hit};
+			if (next_hit == -1) {		
+				if (p_umap.find(page_number) != p_umap.end()) {
+					for (auto i = p_set.begin(), ie = p_set.end(); i != ie; ++i) {
+						if (i->page_number == cur_page.page_number) {
+							p_set.erase(i);
+							break;
+						}
+					}
+					p_umap.erase(page_number);
+					return tick;
+				} 
+				return miss;
+			}
+			if (p_umap.find(page_number) != p_umap.end()) {
+				for (auto i = p_set.begin(), ie = p_set.end(); i!= ie; ++i) {
+					if (i->page_number == page_number) {
+						p_set.erase(i);
+						break;
+					}
+				}
+				p_set.insert(cur_page);
+				p_umap[page_number] = next_hit;
+				return tick;
+			} 
+			if (p_set.size() < cache_size) {
+				p_set.insert(cur_page);
+				p_umap[page_number] = next_hit;
+				
+				return miss;
+			} 
+			if (next_hit > (*p_set.rbegin()).next_hit) 
+				return miss;
 
-template <typename KeyT, typename Compare>
-void IdealCache<KeyT, Compare>::cache_add(const KeyT& key, size_t next_hit) {
-    set_.insert({key, next_hit});
-    umap_[key] = next_hit;
-}
+			p_umap.erase((*p_set.rbegin()).page_number);
+			
+			Page pg_max = *p_set.rbegin();
 
-template <typename KeyT, typename Compare>
-bool IdealCache<KeyT, Compare>::insert_page(const KeyT& key, size_t next_hit) { 
-    printf("inserting page\n");
-    auto it = umap_.find(key); 
-    if (next_hit == 0 && it != umap_.end()) {
-		set_delete_by_key(key);
-        umap_.erase(key);
-		return true;
-    }
-    if (next_hit == 0) { return false; }
-    
-    if (it != umap_.end()) {
-        set_delete_by_key(key);
-        cache_add(key, next_hit);
-        return true;
-    }
-    if (set_.size() < size_) {
-		cache_add(key, next_hit);
-		return false;
-	}
-    auto r_it = set_.rbegin();
-	if (next_hit > r_it->second) { return false; }
-    umap_.erase(r_it->first);
-    set_delete_by_key(r_it->first);
-    cache_add(key, next_hit);
-    return false;
-}
+			for (auto i = p_set.begin(), ie = p_set.end(); i != ie; ++i) {
+				if (i->page_number == pg_max.page_number) {
+					p_set.erase(i);
+					break;
+				}
+			}
 
-template <typename KeyT, typename Compare>
-size_t IdealCache<KeyT, Compare>::get_ans() {
-    printf("before cycle\n");
-    for (auto i: keys_) {
-        printf("here\n");
-		if (data_[i].size() > 0) {
-			data_[i].pop_back();
+			p_set.insert(cur_page);
+			p_umap[page_number] = next_hit;
+
+			return miss;
 		}
-		ans_ += insert_page(i, data_[i].back());
-	}
-	return ans_;
-}
-
+			
+		void coloured_dump() {
+              std::cout << "\033[0;33m" << "IDEAL_CACHE:\n" << "\033[0;0m";
+              for (std::set <struct Page, cmp>::iterator i = p_set.begin(), ie = p_set.end(); i != ie; ++i) 
+                  std::cout << "\033[0;34m" << "[" << "\033[0;0m" << i->page_number << "(" << i->next_hit << ")" << "\033[0;34m" << "]" << "\033[0;0m";
+              std::cout << std::endl;
+        };
+};

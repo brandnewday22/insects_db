@@ -1,0 +1,1 @@
+/usr/bin/c++ -std=c++20 -O2 -g CMakeFiles/IDEAL_CACHE.dir/src/ideal_cache.cpp.o -o IDEAL_CACHE 
